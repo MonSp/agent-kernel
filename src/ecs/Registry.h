@@ -3,6 +3,7 @@
 #include "Component.h"
 #include "Entity.h"
 #include "GenericComponentStore.h"
+#include "SchemaValidator.h"
 #include "components/IdentityComponent.h"
 #include "components/StatsComponent.h"
 #include "components/PersonalityComponent.h"
@@ -208,6 +209,67 @@ public:
         if (it == entityToSlot_.end()) return "{}";
         auto* store = DynamicComponentRegistry::instance().getStore(componentName);
         return store ? store->toJson(it->second) : "{}";
+    }
+
+    // Validate all components on an entity against their schemas
+    ValidationResult validateEntity(EntityId id) {
+        auto it = entityToSlot_.find(id);
+        if (it == entityToSlot_.end() || !activeSlots_[it->second]) {
+            ValidationResult r;
+            r.valid = false;
+            r.violations.push_back({"entity", "exists", "", "Entity not found"});
+            return r;
+        }
+        size_t slot = it->second;
+
+        ValidationResult combined;
+        auto& schemaReg = SchemaRegistry::instance();
+
+        // Helper lambda to validate a hardcoded component
+        auto tryValidate = [&](const std::string& name, auto* compPtr) {
+            if (!compPtr) return;
+            const ComponentSchema* schema = schemaReg.getSchema(name);
+            if (!schema) return;
+            ValidationResult vr = schema->validate(compPtr);
+            if (!vr.valid) {
+                combined.valid = false;
+                for (auto& v : vr.violations) {
+                    // Prefix field name with component name for clarity
+                    v.fieldName = name + "." + v.fieldName;
+                    combined.violations.push_back(std::move(v));
+                }
+            }
+        };
+
+        tryValidate("IdentityComponent", getComponent<IdentityComponent>(id));
+        tryValidate("StatsComponent", getComponent<StatsComponent>(id));
+        tryValidate("PersonalityComponent", getComponent<PersonalityComponent>(id));
+        tryValidate("MemoryRingComponent", getComponent<MemoryRingComponent>(id));
+        tryValidate("LifecycleComponent", getComponent<LifecycleComponent>(id));
+        tryValidate("SocialComponent", getComponent<SocialComponent>(id));
+        tryValidate("SkillTreeComponent", getComponent<SkillTreeComponent>(id));
+        tryValidate("CareerComponent", getComponent<CareerComponent>(id));
+        tryValidate("EvolutionComponent", getComponent<EvolutionComponent>(id));
+
+        // Validate dynamic components
+        for (auto& name : DynamicComponentRegistry::instance().getAllComponentNames()) {
+            auto* store = DynamicComponentRegistry::instance().getStore(name);
+            if (store && store->has(slot)) {
+                const ComponentSchema* schema = store->schema();
+                if (schema) {
+                    ValidationResult vr = schema->validate(store->get(slot));
+                    if (!vr.valid) {
+                        combined.valid = false;
+                        for (auto& v : vr.violations) {
+                            v.fieldName = name + "." + v.fieldName;
+                            combined.violations.push_back(std::move(v));
+                        }
+                    }
+                }
+            }
+        }
+
+        return combined;
     }
 
     // Describe all components on an entity (hardcoded + dynamic) as JSON
