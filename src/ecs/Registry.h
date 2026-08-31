@@ -2,6 +2,7 @@
 
 #include "Component.h"
 #include "Entity.h"
+#include "GenericComponentStore.h"
 #include "components/IdentityComponent.h"
 #include "components/StatsComponent.h"
 #include "components/PersonalityComponent.h"
@@ -16,6 +17,7 @@
 #include <queue>
 #include <optional>
 #include <stdexcept>
+#include <string>
 
 namespace ECS {
 
@@ -68,6 +70,9 @@ public:
         skillTreeComponents_[slot].reset();
         careerComponents_[slot].reset();
         evolutionComponents_[slot].reset();
+
+        // Clean up dynamic components at this slot
+        DynamicComponentRegistry::instance().removeAll(slot);
 
         freeSlots_.push(slot);
         freeIds_.push(id);
@@ -163,6 +168,95 @@ public:
         return result;
     }
 
+    // --- Dynamic component support (Layer 2) ---
+
+    // Attach a dynamic component to an entity
+    void setDynamicComponent(EntityId id, const std::string& componentName, const void* data) {
+        auto it = entityToSlot_.find(id);
+        if (it == entityToSlot_.end()) return;
+        auto* store = DynamicComponentRegistry::instance().getStore(componentName);
+        if (store) store->set(it->second, data);
+    }
+
+    // Get raw pointer to a dynamic component
+    void* getDynamicComponent(EntityId id, const std::string& componentName) {
+        auto it = entityToSlot_.find(id);
+        if (it == entityToSlot_.end()) return nullptr;
+        auto* store = DynamicComponentRegistry::instance().getStore(componentName);
+        return store ? store->get(it->second) : nullptr;
+    }
+
+    // Check if entity has a dynamic component
+    bool hasDynamicComponent(EntityId id, const std::string& componentName) {
+        auto it = entityToSlot_.find(id);
+        if (it == entityToSlot_.end()) return false;
+        auto* store = DynamicComponentRegistry::instance().getStore(componentName);
+        return store ? store->has(it->second) : false;
+    }
+
+    // Remove a dynamic component
+    void removeDynamicComponent(EntityId id, const std::string& componentName) {
+        auto it = entityToSlot_.find(id);
+        if (it == entityToSlot_.end()) return;
+        auto* store = DynamicComponentRegistry::instance().getStore(componentName);
+        if (store) store->remove(it->second);
+    }
+
+    // Serialize a dynamic component to JSON
+    std::string dynamicComponentToJson(EntityId id, const std::string& componentName) {
+        auto it = entityToSlot_.find(id);
+        if (it == entityToSlot_.end()) return "{}";
+        auto* store = DynamicComponentRegistry::instance().getStore(componentName);
+        return store ? store->toJson(it->second) : "{}";
+    }
+
+    // Describe all components on an entity (hardcoded + dynamic) as JSON
+    std::string describeEntity(EntityId id) {
+        auto it = entityToSlot_.find(id);
+        if (it == entityToSlot_.end() || !activeSlots_[it->second]) return "{}";
+        size_t slot = it->second;
+
+        std::string json = "{\"entityId\":" + std::to_string(id) + ",\"components\":{";
+        bool first = true;
+
+        auto& schemaReg = SchemaRegistry::instance();
+
+        // Helper lambda to serialize a hardcoded component
+        auto trySerialize = [&](const std::string& name, auto* compPtr) {
+            if (!compPtr) return;
+            const ComponentSchema* schema = schemaReg.getSchema(name);
+            if (!schema) return;
+            if (!first) json += ",";
+            json += "\"" + name + "\":" + schema->instanceToJson(compPtr);
+            first = false;
+        };
+
+        trySerialize("IdentityComponent", getComponent<IdentityComponent>(id));
+        trySerialize("StatsComponent", getComponent<StatsComponent>(id));
+        trySerialize("PersonalityComponent", getComponent<PersonalityComponent>(id));
+        trySerialize("MemoryRingComponent", getComponent<MemoryRingComponent>(id));
+        trySerialize("LifecycleComponent", getComponent<LifecycleComponent>(id));
+        trySerialize("SocialComponent", getComponent<SocialComponent>(id));
+        trySerialize("SkillTreeComponent", getComponent<SkillTreeComponent>(id));
+        trySerialize("CareerComponent", getComponent<CareerComponent>(id));
+        trySerialize("EvolutionComponent", getComponent<EvolutionComponent>(id));
+
+        // Check dynamic components (only those NOT already serialized as hardcoded)
+        // Dynamic stores for the 9 hardcoded types won't have data at this slot
+        // unless explicitly set via setDynamicComponent, so the has() check suffices.
+        for (auto& name : DynamicComponentRegistry::instance().getAllComponentNames()) {
+            auto* store = DynamicComponentRegistry::instance().getStore(name);
+            if (store && store->has(slot)) {
+                if (!first) json += ",";
+                json += "\"" + ComponentSchema::escapeJsonString(name) + "\":" + store->toJson(slot);
+                first = false;
+            }
+        }
+
+        json += "}}";
+        return json;
+    }
+
 private:
     Registry() = default;
 
@@ -195,6 +289,9 @@ private:
         if (skillTreeComponents_.size() < newSize) skillTreeComponents_.resize(newSize);
         if (careerComponents_.size() < newSize) careerComponents_.resize(newSize);
         if (evolutionComponents_.size() < newSize) evolutionComponents_.resize(newSize);
+
+        // Also grow dynamic component stores
+        DynamicComponentRegistry::instance().growAll(newSize);
     }
 
     template<typename T>

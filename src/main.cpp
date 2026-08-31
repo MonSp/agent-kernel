@@ -1,5 +1,6 @@
 #include "ipc/AgentKernelBridge.h"
 #include "ecs/ComponentSchemas.h"
+#include "ecs/GenericComponentStore.h"
 #include <csignal>
 #include <cstdio>
 #include <cstring>
@@ -47,6 +48,10 @@ int main(int argc, char* argv[]) {
     // Register all component schemas for introspection
     registerAllSchemas();
     printf("Registered %zu component schemas.\n", ECS::SchemaRegistry::instance().getSchemaCount());
+
+    // Initialize dynamic component stores for all 9 existing components
+    ECS::initDynamicRegistryFromSchemas();
+    printf("Initialized dynamic component stores for hybrid registry.\n");
 
     // Block until stopped by signal
     while (bridge.isRunning()) {
