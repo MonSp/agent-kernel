@@ -1,0 +1,218 @@
+{
+  "_comment": "Company skill → Game ability mapping. Names follow Game world conventions (功法/炼丹/阵法/符箓/禁制/机关).",
+
+  "api_design": {
+    "gameAbility": "符箓",
+    "category": "Engineering",
+    "description": "API设计 = 符箓，接口契约与外部通信"
+  },
+  "architecture": {
+    "gameAbility": "阵法",
+    "category": "Engineering",
+    "description": "架构设计 = 阵法，全局结构与系统蓝图"
+  },
+  "backend_dev": {
+    "gameAbility": "阵法",
+    "category": "Engineering",
+    "description": "后端开发 = 阵法，逻辑架构与系统构建"
+  },
+  "code_review": {
+    "gameAbility": "炼器",
+    "category": "Engineering",
+    "description": "代码审查 = 炼器，检验器物品质与瑕疵"
+  },
+  "deployment": {
+    "gameAbility": "传送阵",
+    "category": "Engineering",
+    "description": "部署 = 传送阵，将系统送至目标环境"
+  },
+  "devops": {
+    "gameAbility": "机关",
+    "category": "Engineering",
+    "description": "DevOps = 机关，自动化运维与流水线"
+  },
+  "frontend_dev": {
+    "gameAbility": "符箓",
+    "category": "Engineering",
+    "description": "前端开发 = 符箓，界面构建与交互呈现"
+  },
+  "fullstack_dev": {
+    "gameAbility": "阵法",
+    "category": "Engineering",
+    "description": "全栈开发 = 阵法，前后端贯通"
+  },
+  "incident_response": {
+    "gameAbility": "禁制",
+    "category": "Engineering",
+    "description": "故障响应 = 禁制，紧急修复与危机封堵"
+  },
+  "monitoring": {
+    "gameAbility": "观气术",
+    "category": "Engineering",
+    "description": "监控 = 观气术，持续观测系统运行状态"
+  },
+  "performance": {
+    "gameAbility": "加速符",
+    "category": "Engineering",
+    "description": "性能优化 = 加速符，提升系统运行效率"
+  },
+  "security_audit": {
+    "gameAbility": "禁制",
+    "category": "Engineering",
+    "description": "安全审计 = 禁制，防御漏洞与外部威胁"
+  },
+  "task_decomposition": {
+    "gameAbility": "分神术",
+    "category": "Engineering",
+    "description": "任务分解 = 分神术，将复杂目标拆解为子任务"
+  },
+  "testing": {
+    "gameAbility": "试炼",
+    "category": "Engineering",
+    "description": "测试 = 试炼，验证系统是否达标"
+  },
+
+  "brand_identity": {
+    "gameAbility": "炼器",
+    "category": "Design",
+    "description": "品牌视觉 = 炼器，打造品牌核心识别"
+  },
+  "brand_strategy": {
+    "gameAbility": "观心术",
+    "category": "Design",
+    "description": "品牌策略 = 观心术，洞察市场心智与定位"
+  },
+  "brand_voice": {
+    "gameAbility": "传音",
+    "category": "Design",
+    "description": "品牌声音 = 传音，传递品牌调性与语态"
+  },
+  "graphic_design": {
+    "gameAbility": "铭文",
+    "category": "Design",
+    "description": "平面设计 = 铭文，视觉元素的编排与创作"
+  },
+  "image_generation": {
+    "gameAbility": "幻化术",
+    "category": "Design",
+    "description": "图像生成 = 幻化术，凭意念创造视觉形象"
+  },
+  "persona_development": {
+    "gameAbility": "读心术",
+    "category": "Design",
+    "description": "用户画像 = 读心术，理解目标用户特征"
+  },
+  "ppt_design": {
+    "gameAbility": "铭文",
+    "category": "Design",
+    "description": "PPT设计 = 铭文，信息的视觉化呈现"
+  },
+  "sound_design": {
+    "gameAbility": "天籁术",
+    "category": "Design",
+    "description": "音效设计 = 天籁术，创造听觉体验"
+  },
+  "usability_testing": {
+    "gameAbility": "试器",
+    "category": "Design",
+    "description": "可用性测试 = 试器，验证器物的易用性"
+  },
+  "user_research": {
+    "gameAbility": "探心术",
+    "category": "Design",
+    "description": "用户研究 = 探心术，深入探索用户需求"
+  },
+
+  "content_editing": {
+    "gameAbility": "经文",
+    "category": "Content",
+    "description": "内容编辑 = 经文，润色与修正文字"
+  },
+  "content_writing": {
+    "gameAbility": "经文",
+    "category": "Content",
+    "description": "内容写作 = 经文，创作优质内容"
+  },
+  "copywriting": {
+    "gameAbility": "咒文",
+    "category": "Content",
+    "description": "文案撰写 = 咒文，精准有力的文字表达"
+  },
+  "presentation_coaching": {
+    "gameAbility": "传法",
+    "category": "Content",
+    "description": "演讲辅导 = 传法，传授表达与沟通之术"
+  },
+  "script_writing": {
+    "gameAbility": "经文",
+    "category": "Content",
+    "description": "剧本创作 = 经文，叙事结构与角色塑造"
+  },
+  "video_editing": {
+    "gameAbility": "幻影术",
+    "category": "Content",
+    "description": "视频剪辑 = 幻影术，动态影像的剪切与编排"
+  },
+  "video_generation": {
+    "gameAbility": "幻影术",
+    "category": "Content",
+    "description": "视频生成 = 幻影术，凭空创造动态影像"
+  },
+
+  "data_analysis": {
+    "gameAbility": "推演术",
+    "category": "Data",
+    "description": "数据分析 = 推演术，从数据中推理洞察"
+  },
+  "data_engineering": {
+    "gameAbility": "阵法",
+    "category": "Data",
+    "description": "数据工程 = 阵法，构建数据流通的基础设施"
+  },
+  "data_presentation": {
+    "gameAbility": "天象",
+    "category": "Data",
+    "description": "数据呈现 = 天象，将数据转化为可理解的报告"
+  },
+  "data_visualization": {
+    "gameAbility": "观星术",
+    "category": "Data",
+    "description": "数据可视化 = 观星术，以图表映射数据星图"
+  },
+  "database": {
+    "gameAbility": "藏经阁",
+    "category": "Data",
+    "description": "数据库 = 藏经阁，存储与检索海量知识"
+  },
+  "ml_engineering": {
+    "gameAbility": "炼丹",
+    "category": "Data",
+    "description": "机器学习 = 炼丹，以数据炼化智能模型"
+  },
+
+  "competitive_analysis": {
+    "gameAbility": "天机术",
+    "category": "Management",
+    "description": "竞争分析 = 天机术，洞察对手与市场格局"
+  },
+  "progress_tracking": {
+    "gameAbility": "罗盘",
+    "category": "Management",
+    "description": "进度跟踪 = 罗盘，掌控任务进展与方向"
+  },
+  "risk_management": {
+    "gameAbility": "化劫术",
+    "category": "Management",
+    "description": "风险管理 = 化劫术，预判与化解潜在危机"
+  },
+  "sales_enablement": {
+    "gameAbility": "商道",
+    "category": "Management",
+    "description": "销售赋能 = 商道，赋能销售团队与客户沟通"
+  },
+  "sales_qualification": {
+    "gameAbility": "识人术",
+    "category": "Management",
+    "description": "销售资质 = 识人术，识别潜在客户与商机"
+  }
+}
