@@ -1,4 +1,5 @@
 #include "ipc/AgentKernelBridge.h"
+#include "ecs/ComponentSchemas.h"
 #include <csignal>
 #include <cstdio>
 #include <cstring>
@@ -42,6 +43,10 @@ int main(int argc, char* argv[]) {
     }
 
     printf("agent-kernel-daemon listening on %s\n", socketPath.c_str());
+
+    // Register all component schemas for introspection
+    registerAllSchemas();
+    printf("Registered %zu component schemas.\n", ECS::SchemaRegistry::instance().getSchemaCount());
 
     // Block until stopped by signal
     while (bridge.isRunning()) {

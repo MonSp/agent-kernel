@@ -36,6 +36,9 @@ namespace Method {
     inline const std::string addCareerXp  = "addCareerXp";
     inline const std::string getSkills    = "getSkills";
     inline const std::string syncState    = "syncState";
+    inline const std::string getSchemas    = "getSchemas";
+    inline const std::string getSchema     = "getSchema";
+    inline const std::string describeEntity = "describeEntity";
 } // namespace Method
 
 } // namespace IPC

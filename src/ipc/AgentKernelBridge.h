@@ -3,9 +3,17 @@
 #include "Protocol.h"
 #include "UnixSocketServer.h"
 #include "../ecs/Registry.h"
+#include "../ecs/Schema.h"
+#include "../ecs/ComponentSchemas.h"
 #include "../ecs/components/IdentityComponent.h"
+#include "../ecs/components/StatsComponent.h"
+#include "../ecs/components/PersonalityComponent.h"
+#include "../ecs/components/LifecycleComponent.h"
+#include "../ecs/components/SocialComponent.h"
+#include "../ecs/components/MemoryRingComponent.h"
 #include "../ecs/components/SkillTreeComponent.h"
 #include "../ecs/components/CareerComponent.h"
+#include "../ecs/components/EvolutionComponent.h"
 #include <string>
 #include <functional>
 #include <cstdio>
@@ -135,6 +143,17 @@ inline std::string error(const std::string& msg) {
     return "{\"ok\":false,\"error\":\"" + escape(msg) + "\"}";
 }
 
+// Compact JSON by stripping embedded newlines/carriage returns
+// (needed when schema output contains \n that conflicts with newline-delimited IPC)
+inline std::string compact(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s) {
+        if (c != '\n' && c != '\r') out += c;
+    }
+    return out;
+}
+
 } // namespace json
 
 // --- Enum string conversions ---
@@ -248,7 +267,85 @@ inline std::string toJson(const CareerComponent& career) {
            ",\"avgReviewScore\":" + std::to_string(career.avgReviewScore) + "}";
 }
 
-// Serialize a full agent (all relevant components)
+inline std::string realmLevelToString(RealmLevel r) {
+    switch (r) {
+        case RealmLevel::Mortal:            return "Mortal";
+        case RealmLevel::QiRefining:        return "QiRefining";
+        case RealmLevel::FoundationBuilding: return "FoundationBuilding";
+        case RealmLevel::GoldenCore:        return "GoldenCore";
+        case RealmLevel::YuanInfant:        return "YuanInfant";
+        case RealmLevel::Transcension:      return "Transcension";
+        default: return "Mortal";
+    }
+}
+
+inline std::string toJson(const StatsComponent& stats) {
+    return "{\"power\":" + std::to_string(stats.power) +
+           ",\"hp\":" + std::to_string(stats.hp) +
+           ",\"maxHp\":" + std::to_string(stats.maxHp) +
+           ",\"mp\":" + std::to_string(stats.mp) +
+           ",\"maxMp\":" + std::to_string(stats.maxMp) +
+           ",\"realm\":\"" + realmLevelToString(stats.realm) +
+           "\",\"xp\":" + std::to_string(stats.xp) +
+           ",\"careerLevel\":" + std::to_string(stats.careerLevel) + "}";
+}
+
+inline std::string toJson(const PersonalityComponent& p) {
+    return "{\"ambition\":" + std::to_string(p.ambition) +
+           ",\"caution\":" + std::to_string(p.caution) +
+           ",\"loyalty\":" + std::to_string(p.loyalty) +
+           ",\"greed\":" + std::to_string(p.greed) +
+           ",\"sociability\":" + std::to_string(p.sociability) +
+           ",\"diligence\":" + std::to_string(p.diligence) + "}";
+}
+
+inline std::string lifeStateToString(AgentLifeState s) {
+    switch (s) {
+        case AgentLifeState::Idle:       return "Idle";
+        case AgentLifeState::Active:     return "Active";
+        case AgentLifeState::Paused:     return "Paused";
+        case AgentLifeState::Terminated: return "Terminated";
+        default: return "Idle";
+    }
+}
+
+inline std::string birthTypeToString(BirthType b) {
+    switch (b) {
+        case BirthType::Natural:    return "Natural";
+        case BirthType::WarOrphan:  return "WarOrphan";
+        case BirthType::Wanderer:   return "Wanderer";
+        case BirthType::DemonBeast: return "DemonBeast";
+        default: return "Natural";
+    }
+}
+
+inline std::string toJson(const LifecycleComponent& lc) {
+    return "{\"birthTime\":" + std::to_string(lc.birthTime) +
+           ",\"age\":" + std::to_string(lc.age) +
+           ",\"lifeState\":\"" + lifeStateToString(lc.lifeState) +
+           "\",\"birthType\":\"" + birthTypeToString(lc.birthType) +
+           "\",\"lastUpdateTime\":" + std::to_string(lc.lastUpdateTime) + "}";
+}
+
+inline std::string toJson(const SocialComponent& sc) {
+    return "{\"hunger\":" + std::to_string(sc.hunger) +
+           ",\"fatigue\":" + std::to_string(sc.fatigue) +
+           ",\"energy\":" + std::to_string(sc.energy) +
+           ",\"socialDesire\":" + std::to_string(sc.socialDesire) +
+           ",\"mood\":" + std::to_string(sc.mood) +
+           ",\"anger\":" + std::to_string(sc.anger) +
+           ",\"fear\":" + std::to_string(sc.fear) +
+           ",\"joy\":" + std::to_string(sc.joy) + "}";
+}
+
+inline std::string toJson(const EvolutionComponent& evo) {
+    return "{\"totalEvolutions\":" + std::to_string(evo.totalEvolutions) +
+           ",\"successfulEvolutions\":" + std::to_string(evo.successfulEvolutions) +
+           ",\"diversityScore\":" + std::to_string(evo.diversityScore) +
+           ",\"historySize\":" + std::to_string(evo.history.size()) + "}";
+}
+
+// Serialize a full agent (all 9 components)
 inline std::string agentToJson(ECS::EntityId entityId) {
     auto& reg = ECS::Registry::getInstance();
     std::string result = "{\"entityId\":" + std::to_string(entityId);
@@ -256,6 +353,44 @@ inline std::string agentToJson(ECS::EntityId entityId) {
     auto* identity = reg.getComponent<IdentityComponent>(entityId);
     if (identity) {
         result += ",\"identity\":" + toJson(*identity);
+    }
+
+    auto* stats = reg.getComponent<StatsComponent>(entityId);
+    if (stats) {
+        result += ",\"stats\":" + toJson(*stats);
+    }
+
+    auto* personality = reg.getComponent<PersonalityComponent>(entityId);
+    if (personality) {
+        result += ",\"personality\":" + toJson(*personality);
+    }
+
+    auto* lifecycle = reg.getComponent<LifecycleComponent>(entityId);
+    if (lifecycle) {
+        result += ",\"lifecycle\":" + toJson(*lifecycle);
+    }
+
+    auto* social = reg.getComponent<SocialComponent>(entityId);
+    if (social) {
+        result += ",\"social\":" + toJson(*social);
+    }
+
+    auto* memory = reg.getComponent<MemoryRingComponent>(entityId);
+    if (memory) {
+        // Summary only — report buffer occupancy, not full ring buffer contents
+        result += ",\"memory\":{";
+        result += "\"hasData\":";
+        result += (memory->interactions.size() > 0 || memory->witnessed.size() > 0 ||
+                   memory->commandMemory.size() > 0 || memory->rumors.size() > 0 ||
+                   memory->midTerm.size() > 0 || memory->longTerm.size() > 0)
+                  ? "true" : "false";
+        result += ",\"interactions\":" + std::to_string(memory->interactions.size());
+        result += ",\"witnessed\":" + std::to_string(memory->witnessed.size());
+        result += ",\"commandMemory\":" + std::to_string(memory->commandMemory.size());
+        result += ",\"rumors\":" + std::to_string(memory->rumors.size());
+        result += ",\"midTerm\":" + std::to_string(memory->midTerm.size());
+        result += ",\"longTerm\":" + std::to_string(memory->longTerm.size());
+        result += "}";
     }
 
     auto* skillTree = reg.getComponent<SkillTreeComponent>(entityId);
@@ -266,6 +401,11 @@ inline std::string agentToJson(ECS::EntityId entityId) {
     auto* career = reg.getComponent<CareerComponent>(entityId);
     if (career) {
         result += ",\"career\":" + toJson(*career);
+    }
+
+    auto* evolution = reg.getComponent<EvolutionComponent>(entityId);
+    if (evolution) {
+        result += ",\"evolution\":" + toJson(*evolution);
     }
 
     result += "}";
@@ -304,6 +444,9 @@ private:
         if (method == Method::addCareerXp)  return handleAddCareerXp(raw);
         if (method == Method::getSkills)    return handleGetSkills(raw);
         if (method == Method::syncState)    return handleSyncState(raw);
+        if (method == Method::getSchemas)   return handleGetSchemas();
+        if (method == Method::getSchema)    return handleGetSchema(raw);
+        if (method == Method::describeEntity) return handleDescribeEntity(raw);
 
         return json::error("unknown method: " + method);
     }
@@ -330,8 +473,14 @@ private:
 
         AgentRole role = stringToRole(roleStr);
         reg.addComponent<IdentityComponent>(eid, agentId, name, dept, crole, teamId, role);
+        reg.addComponent<StatsComponent>(eid);
+        reg.addComponent<PersonalityComponent>(eid);
+        reg.addComponent<LifecycleComponent>(eid);
+        reg.addComponent<SocialComponent>(eid);
+        reg.addComponent<MemoryRingComponent>(eid);
         reg.addComponent<SkillTreeComponent>(eid);
         reg.addComponent<CareerComponent>(eid);
+        reg.addComponent<EvolutionComponent>(eid);
 
         return json::ok(agentToJson(eid));
     }
@@ -521,6 +670,154 @@ private:
             result += agentToJson(entities[i]);
         }
         result += "],\"count\":" + std::to_string(entities.size()) + "}";
+        return json::ok(result);
+    }
+
+    // getSchemas: { "method":"getSchemas" }
+    // Returns all registered component schemas as JSON Schema
+    std::string handleGetSchemas() {
+        auto& schemaReg = ECS::SchemaRegistry::instance();
+        std::string schemas = json::compact(schemaReg.exportAllJsonSchemas());
+        return json::ok("{\"schemas\":" + schemas + "}");
+    }
+
+    // getSchema: { "method":"getSchema", "params": { "componentName": "StatsComponent" } }
+    // Returns one component's schema
+    std::string handleGetSchema(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        if (params.empty()) return json::error("missing params");
+
+        std::string componentName = json::getString(params, "componentName");
+        if (componentName.empty()) return json::error("componentName is required");
+
+        auto& schemaReg = ECS::SchemaRegistry::instance();
+        const ECS::ComponentSchema* schema = schemaReg.getSchema(componentName);
+        if (!schema) {
+            return json::error("schema not found: " + componentName);
+        }
+
+        return json::ok("{\"componentName\":\"" + json::escape(componentName) +
+                         "\",\"schema\":" + json::compact(schema->toJsonSchema()) + "}");
+    }
+
+    // describeEntity: { "method":"describeEntity", "params": { "entityId": 0 } }
+    // Returns what components an entity has + their current values
+    std::string handleDescribeEntity(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        if (params.empty()) return json::error("missing params");
+
+        uint64_t entityId = static_cast<uint64_t>(json::getInt(params, "entityId", -1));
+
+        auto& reg = ECS::Registry::getInstance();
+        if (!reg.isEntityValid(entityId)) {
+            return json::error("entity not found");
+        }
+
+        auto& schemaReg = ECS::SchemaRegistry::instance();
+        std::string result = "{\"entityId\":" + std::to_string(entityId) + ",\"components\":{";
+        bool first = true;
+
+        // Helper lambda to append a component
+        auto appendComponent = [&](const std::string& name, const std::string& jsonVal) {
+            if (!first) result += ",";
+            first = false;
+            result += "\"" + json::escape(name) + "\":" + jsonVal;
+        };
+
+        // Check each of the 9 component types
+        {
+            auto* c = reg.getComponent<IdentityComponent>(entityId);
+            if (c) appendComponent("IdentityComponent", toJson(*c));
+        }
+        {
+            auto* c = reg.getComponent<StatsComponent>(entityId);
+            if (c) {
+                const ECS::ComponentSchema* schema = schemaReg.getSchema("StatsComponent");
+                if (schema && !schema->fields.empty()) {
+                    appendComponent("StatsComponent", schema->instanceToJson(c));
+                } else {
+                    appendComponent("StatsComponent", toJson(*c));
+                }
+            }
+        }
+        {
+            auto* c = reg.getComponent<PersonalityComponent>(entityId);
+            if (c) {
+                const ECS::ComponentSchema* schema = schemaReg.getSchema("PersonalityComponent");
+                if (schema && !schema->fields.empty()) {
+                    appendComponent("PersonalityComponent", schema->instanceToJson(c));
+                } else {
+                    appendComponent("PersonalityComponent", toJson(*c));
+                }
+            }
+        }
+        {
+            auto* c = reg.getComponent<LifecycleComponent>(entityId);
+            if (c) {
+                const ECS::ComponentSchema* schema = schemaReg.getSchema("LifecycleComponent");
+                if (schema && !schema->fields.empty()) {
+                    appendComponent("LifecycleComponent", schema->instanceToJson(c));
+                } else {
+                    appendComponent("LifecycleComponent", toJson(*c));
+                }
+            }
+        }
+        {
+            auto* c = reg.getComponent<SocialComponent>(entityId);
+            if (c) {
+                const ECS::ComponentSchema* schema = schemaReg.getSchema("SocialComponent");
+                if (schema && !schema->fields.empty()) {
+                    appendComponent("SocialComponent", schema->instanceToJson(c));
+                } else {
+                    appendComponent("SocialComponent", toJson(*c));
+                }
+            }
+        }
+        {
+            auto* c = reg.getComponent<MemoryRingComponent>(entityId);
+            if (c) {
+                // MemoryRingComponent has no field-level schema, use summary
+                std::string memJson = "{\"hasData\":";
+                memJson += (c->interactions.size() > 0 || c->witnessed.size() > 0 ||
+                            c->commandMemory.size() > 0 || c->rumors.size() > 0 ||
+                            c->midTerm.size() > 0 || c->longTerm.size() > 0)
+                           ? "true" : "false";
+                memJson += ",\"interactions\":" + std::to_string(c->interactions.size());
+                memJson += ",\"witnessed\":" + std::to_string(c->witnessed.size());
+                memJson += ",\"rumors\":" + std::to_string(c->rumors.size());
+                memJson += ",\"longTerm\":" + std::to_string(c->longTerm.size());
+                memJson += "}";
+                appendComponent("MemoryRingComponent", memJson);
+            }
+        }
+        {
+            auto* c = reg.getComponent<SkillTreeComponent>(entityId);
+            if (c) appendComponent("SkillTreeComponent", toJson(*c));
+        }
+        {
+            auto* c = reg.getComponent<CareerComponent>(entityId);
+            if (c) {
+                const ECS::ComponentSchema* schema = schemaReg.getSchema("CareerComponent");
+                if (schema && !schema->fields.empty()) {
+                    appendComponent("CareerComponent", schema->instanceToJson(c));
+                } else {
+                    appendComponent("CareerComponent", toJson(*c));
+                }
+            }
+        }
+        {
+            auto* c = reg.getComponent<EvolutionComponent>(entityId);
+            if (c) {
+                const ECS::ComponentSchema* schema = schemaReg.getSchema("EvolutionComponent");
+                if (schema && !schema->fields.empty()) {
+                    appendComponent("EvolutionComponent", schema->instanceToJson(c));
+                } else {
+                    appendComponent("EvolutionComponent", toJson(*c));
+                }
+            }
+        }
+
+        result += "}}";
         return json::ok(result);
     }
 
