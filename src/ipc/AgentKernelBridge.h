@@ -17,9 +17,13 @@
 #include "../ecs/components/SkillTreeComponent.h"
 #include "../ecs/components/CareerComponent.h"
 #include "../ecs/components/EvolutionComponent.h"
+#include "../llm/DecisionEngine.h"
+#include "../ecs/systems/TickEngine.h"
+#include "../ecs/systems/SimulationRunner.h"
 #include <string>
 #include <functional>
 #include <cstdio>
+#include <vector>
 
 namespace IPC {
 
@@ -453,6 +457,9 @@ private:
         if (method == Method::validateEntity) return handleValidateEntity(raw);
         if (method == Method::listArchetypes) return handleListArchetypes();
         if (method == Method::createFromArchetype) return handleCreateFromArchetype(raw);
+        if (method == Method::agentDecide)        return handleAgentDecide(raw);
+        if (method == Method::agentTick)          return handleAgentTick(raw);
+        if (method == Method::runSimulation)      return handleRunSimulation(raw);
 
         return json::error("unknown method: " + method);
     }
@@ -913,6 +920,129 @@ private:
 
         return json::ok(agentToJson(eid));
     }
+
+    // agentDecide: { "method":"agentDecide", "params": { "entityId": 0, "task": "review this code" } }
+    std::string handleAgentDecide(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        if (params.empty()) return json::error("missing params");
+
+        uint64_t entityId = static_cast<uint64_t>(json::getInt(params, "entityId", -1));
+        std::string task = json::getString(params, "task");
+        if (task.empty()) return json::error("task is required");
+
+        auto& reg = ECS::Registry::getInstance();
+        if (!reg.isEntityValid(entityId)) {
+            return json::error("entity not found");
+        }
+
+        // Create LLM client (stub mode if no API key in environment)
+        LLM::LLMConfig cfg;
+        cfg.provider  = LLM::Provider::Custom;
+        cfg.baseUrl   = "http://localhost:8080/v1";
+        cfg.model     = "stub-model";
+        cfg.maxTokens = 512;
+        LLM::LLMClient llmClient(cfg);
+        LLM::DecisionEngine engine(&llmClient);
+
+        LLM::Decision decision = engine.decide(reg, entityId, task);
+        return json::ok(json::compact(decision.toJson()));
+    }
+
+    // agentTick: { "method":"agentTick", "params": { "entityId": 0, "task": "implement feature" } }
+    std::string handleAgentTick(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        if (params.empty()) return json::error("missing params");
+
+        uint64_t entityId = static_cast<uint64_t>(json::getInt(params, "entityId", -1));
+        std::string task = json::getString(params, "task");
+        if (task.empty()) return json::error("task is required");
+
+        auto& reg = ECS::Registry::getInstance();
+        if (!reg.isEntityValid(entityId)) {
+            return json::error("entity not found");
+        }
+
+        LLM::LLMConfig cfg;
+        cfg.provider  = LLM::Provider::Custom;
+        cfg.baseUrl   = "http://localhost:8080/v1";
+        cfg.model     = "stub-model";
+        cfg.maxTokens = 512;
+        if (!tickLlmClient_) {
+            tickLlmClient_ = std::make_unique<LLM::LLMClient>(cfg);
+            tickEngine_ = std::make_unique<Systems::TickEngine>(tickLlmClient_.get());
+        }
+
+        Systems::TickResult result = tickEngine_->tick(reg, entityId, task);
+        return json::ok(json::compact(result.toJson()));
+    }
+
+    // runSimulation: { "method":"runSimulation", "params": { "entityIds": [0,1], "ticks": 3, "tasks": ["task A","task B"] } }
+    std::string handleRunSimulation(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        if (params.empty()) return json::error("missing params");
+
+        int ticks = json::getInt(params, "ticks", 1);
+        if (ticks < 1) return json::error("ticks must be >= 1");
+
+        // Parse entityIds array
+        std::string idsRaw = json::getRawValue(params, "entityIds");
+        std::vector<ECS::EntityId> entityIds;
+        {
+            size_t pos = 0;
+            while ((pos = idsRaw.find_first_of("0123456789", pos)) != std::string::npos) {
+                size_t end = idsRaw.find_first_not_of("0123456789", pos);
+                entityIds.push_back(static_cast<ECS::EntityId>(std::stoull(idsRaw.substr(pos, end - pos))));
+                pos = end;
+            }
+        }
+        if (entityIds.empty()) return json::error("entityIds is empty");
+
+        auto& reg = ECS::Registry::getInstance();
+        for (auto id : entityIds) {
+            if (!reg.isEntityValid(id)) {
+                return json::error("entity not found: " + std::to_string(id));
+            }
+        }
+
+        // Parse tasks array
+        std::vector<std::string> tasks;
+        std::string tasksRaw = json::getRawValue(params, "tasks");
+        {
+            size_t pos = 0;
+            while ((pos = tasksRaw.find('"', pos)) != std::string::npos) {
+                size_t end = tasksRaw.find('"', pos + 1);
+                if (end == std::string::npos) break;
+                tasks.push_back(tasksRaw.substr(pos + 1, end - pos - 1));
+                pos = end + 1;
+            }
+        }
+
+        if (!tickLlmClient_) {
+            LLM::LLMConfig cfg;
+            cfg.provider  = LLM::Provider::Custom;
+            cfg.baseUrl   = "http://localhost:8080/v1";
+            cfg.model     = "stub-model";
+            cfg.maxTokens = 512;
+            tickLlmClient_ = std::make_unique<LLM::LLMClient>(cfg);
+            tickEngine_ = std::make_unique<Systems::TickEngine>(tickLlmClient_.get());
+        }
+
+        Systems::SimulationRunner runner(tickEngine_.get());
+        auto results = runner.run(reg, entityIds, ticks, tasks);
+        auto summary = Systems::SimulationRunner::summarize(results);
+
+        // Build JSON response
+        std::string resp = "{\"results\":[";
+        for (size_t i = 0; i < results.size(); ++i) {
+            if (i > 0) resp += ",";
+            resp += json::compact(results[i].toJson());
+        }
+        resp += "],\"summary\":" + json::compact(summary.toJson()) + "}";
+        return json::ok(resp);
+    }
+
+    std::unique_ptr<LLM::LLMClient> tickLlmClient_;
+    std::unique_ptr<Systems::TickEngine> tickEngine_;
 
     UnixSocketServer server_;
 };

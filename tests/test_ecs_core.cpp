@@ -91,6 +91,23 @@ static void testClear() {
 extern void runComponentTests();
 extern void runNewComponentTests();
 extern void runIpcTests();
+extern void runSchemaTests();
+extern void runComponentSchemaRegistrationTests();
+extern void runSchemaIpcTests();
+extern void runDynamicStoreTests();
+extern void runHybridRegistryTests();
+extern void runArchetypeTests();
+extern void runValidationTests();
+extern void runArchetypeIpcTests();
+extern void runLlmTests();
+extern void runPromptBuilderTests();
+extern void runDecisionEngineTests();
+extern void runActionTypesTests();
+extern void runActionEffectTests();
+extern void runActionExecutorTests();
+extern void runTickEngineTests();
+extern void runSimulationRunnerTests();
+extern void runIpcTickTests();
 
 int main() {
     printf("Running agent-kernel ECS core tests...\n");
@@ -110,6 +127,57 @@ int main() {
 
     printf("\n");
     runIpcTests();
+
+    printf("\n");
+    runSchemaTests();
+
+    printf("\n");
+    runComponentSchemaRegistrationTests();
+
+    printf("\n");
+    runSchemaIpcTests();
+
+    printf("\n");
+    runDynamicStoreTests();
+
+    printf("\n");
+    runHybridRegistryTests();
+
+    printf("\n");
+    runArchetypeTests();
+
+    printf("\n");
+    runValidationTests();
+
+    printf("\n");
+    runArchetypeIpcTests();
+
+    printf("\n");
+    runLlmTests();
+
+    printf("\n");
+    runPromptBuilderTests();
+
+    printf("\n");
+    runDecisionEngineTests();
+
+    printf("\n");
+    runActionTypesTests();
+
+    printf("\n");
+    runActionEffectTests();
+
+    printf("\n");
+    runActionExecutorTests();
+
+    printf("\n");
+    runTickEngineTests();
+
+    printf("\n");
+    runSimulationRunnerTests();
+
+    printf("\n");
+    runIpcTickTests();
 
     printf("\nAll tests PASSED.\n");
     return 0;
