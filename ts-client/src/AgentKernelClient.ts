@@ -2,10 +2,16 @@ import * as net from 'net';
 import {
   AgentProfile,
   CreateAgentParams,
+  Decision,
+  JournalEvent,
   KernelRequest,
   KernelResponse,
+  MailboxMessage,
   PendingRequest,
+  SimulationResult,
   SkillNode,
+  StreamEvent,
+  TickResult,
 } from './types';
 
 const DEFAULT_SOCKET_PATH = '/tmp/agent-kernel.sock';
@@ -153,6 +159,81 @@ export class AgentKernelClient {
    */
   async syncState(): Promise<{ agents: AgentProfile[]; count: number }> {
     const resp = await this.request<{ agents: AgentProfile[]; count: number }>('syncState');
+    return resp;
+  }
+
+  // ─── L4: LLM Decision ─────────────────────────────────────────
+
+  /**
+   * Ask the kernel's LLM to make a decision for an agent on a task.
+   */
+  async agentDecide(entityId: number, task: string): Promise<Decision> {
+    const resp = await this.request<Decision>('agentDecide', { entityId, task });
+    return resp;
+  }
+
+  // ─── L5: Agent Tick & Simulation ─────────────────────────────
+
+  /**
+   * Run a single agent tick: perceive → LLM decide → execute → apply effects.
+   */
+  async agentTick(entityId: number, task: string): Promise<TickResult> {
+    const resp = await this.request<TickResult>('agentTick', { entityId, task });
+    return resp;
+  }
+
+  /**
+   * Run a multi-agent batch simulation for N ticks.
+   */
+  async runSimulation(
+    entityIds: number[],
+    ticks: number = 1,
+    tasks?: string[],
+  ): Promise<SimulationResult> {
+    const params: Record<string, unknown> = { entityIds, ticks };
+    if (tasks) params.tasks = tasks;
+    const resp = await this.request<SimulationResult>('runSimulation', params);
+    return resp;
+  }
+
+  // ─── L6: EventJournal ────────────────────────────────────────
+
+  /**
+   * Append an event to the kernel's EventJournal.
+   */
+  async appendEvent(entityId: number, eventType: string, payload: string): Promise<number> {
+    const resp = await this.request<{ eventId: number }>('appendEvent', { entityId, eventType, payload });
+    return resp.eventId;
+  }
+
+  /**
+   * Query events from the EventJournal.
+   */
+  async getEvents(options?: { entityId?: number; sinceId?: number }): Promise<JournalEvent[]> {
+    const params: Record<string, unknown> = {};
+    if (options?.entityId !== undefined) params.entityId = options.entityId;
+    if (options?.sinceId !== undefined) params.sinceId = options.sinceId;
+    const resp = await this.request<{ events: JournalEvent[] }>('getEvents', params);
+    return resp.events;
+  }
+
+  // ─── L6: AgentMailbox ───────────────────────────────────────
+
+  /**
+   * Send a message from one entity to another via the kernel mailbox.
+   */
+  async sendMessage(from: number, to: number, payload: string): Promise<number> {
+    const resp = await this.request<{ messageId: number }>('sendMessage', { from, to, payload });
+    return resp.messageId;
+  }
+
+  /**
+   * Receive undelivered messages for an entity.
+   */
+  async getMessages(entityId: number, limit?: number): Promise<{ messages: MailboxMessage[]; pending: number }> {
+    const params: Record<string, unknown> = { entityId };
+    if (limit !== undefined) params.limit = limit;
+    const resp = await this.request<{ messages: MailboxMessage[]; pending: number }>('getMessages', params);
     return resp;
   }
 

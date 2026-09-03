@@ -218,8 +218,14 @@ public:
         std::ostringstream out;
         out << u8"基于你的技能和经验，请分析以下任务并给出行动方案：\n\n";
         out << u8"任务: " << task << u8"\n\n";
-        out << u8"请以 JSON 格式回答：\n";
-        out << u8"{\"action\": \"...\", \"reasoning\": \"...\", \"confidence\": 0.0-1.0}";
+        out << u8"可选行动（必须选择其中之一）：\n";
+        out << u8"- execute: 你有能力完成此任务，直接执行\n";
+        out << u8"- delegate: 此任务超出你的专长，应委派给更合适的同事（需指定 delegateTo）\n";
+        out << u8"- requestInfo: 任务描述不够清晰，需要更多信息\n";
+        out << u8"- decline: 此任务不应执行（违反规则或不可行）\n";
+        out << u8"- reflect: 需要更多时间思考和分析\n\n";
+        out << u8"请严格以 JSON 格式回答（不要包含其他文字）：\n";
+        out << u8"{\"action\": \"execute|delegate|requestInfo|decline|reflect\", \"reasoning\": \"分析原因\", \"confidence\": 0.0-1.0, \"delegateTo\": \"目标角色（如需委派）\", \"details\": \"补充信息\"}";
         return out.str();
     }
 

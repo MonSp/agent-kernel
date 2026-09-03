@@ -45,6 +45,10 @@ namespace Method {
     inline const std::string agentDecide         = "agentDecide";
     inline const std::string agentTick           = "agentTick";
     inline const std::string runSimulation       = "runSimulation";
+    inline const std::string appendEvent         = "appendEvent";
+    inline const std::string getEvents           = "getEvents";
+    inline const std::string sendMessage         = "sendMessage";
+    inline const std::string getMessages         = "getMessages";
 } // namespace Method
 
 } // namespace IPC

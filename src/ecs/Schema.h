@@ -12,6 +12,9 @@
 
 namespace ECS {
 
+// ─── Forward declarations ─────────────────────────────────────────────────────
+struct ValidationResult;  // defined in SchemaValidator.h
+
 // ─── FieldType enum ──────────────────────────────────────────────────────────
 
 enum class FieldType : uint8_t {
@@ -225,6 +228,11 @@ struct ComponentSchema {
         oss << "}";
         return oss.str();
     }
+
+    // ── Validation ─────────────────────────────────────────────────────────
+
+    // Full implementation in SchemaValidator.h (needs complete ValidationResult)
+    ValidationResult validate(const void* componentPtr) const;
 
     // ── Instance → JSON using schema ─────────────────────────────────────────
 

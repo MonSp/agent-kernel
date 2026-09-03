@@ -23,6 +23,8 @@
 #include "ecs/Component.h"
 #include "ecs/Entity.h"
 #include "ecs/Archetype.h"
+#include "ecs/EntityArchetype.h"
+#include "ecs/BuiltinArchetypes.h"
 #include "ecs/Registry.h"
 #include "ecs/EventStringPool.h"
 

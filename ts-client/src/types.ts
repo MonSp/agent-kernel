@@ -91,3 +91,67 @@ export interface PendingRequest {
   resolve: (value: unknown) => void;
   reject: (reason: Error) => void;
 }
+
+/** L4 Decision returned by agentDecide. */
+export interface Decision {
+  action: 'execute' | 'delegate' | 'requestInfo' | 'decline' | 'reflect';
+  reasoning: string;
+  confidence: number;
+  delegateTo?: string;
+  details?: string;
+}
+
+/** A single effect applied during a tick. */
+export interface ActionEffect {
+  target: number;   // TargetComponent enum
+  fieldName: string;
+  delta: number;
+  description: string;
+}
+
+/** L5 TickResult returned by agentTick. */
+export interface TickResult {
+  action: string;       // ActionType string
+  tickNumber: number;
+  timestamp: number;
+  decision: Decision;
+  effects: ActionEffect[];
+}
+
+/** L5 SimulationSummary returned by runSimulation. */
+export interface SimulationSummary {
+  totalTicks: number;
+  averageConfidence: number;
+  actionCounts: Record<string, number>;
+}
+
+/** L5 runSimulation response. */
+export interface SimulationResult {
+  results: TickResult[];
+  summary: SimulationSummary;
+}
+
+/** L6: A journal event from EventJournal. */
+export interface JournalEvent {
+  id: number;
+  timestamp: number;
+  entityId: number;
+  eventType: string;
+  payload: string;
+}
+
+/** L6: A mailbox message from AgentMailbox. */
+export interface MailboxMessage {
+  id: number;
+  from: number;
+  to: number;
+  payload: string;
+  timestamp: number;
+  delivered: boolean;
+  acked: boolean;
+}
+
+/** L6: An event pushed from the EventStreamServer. */
+export type StreamEvent =
+  | { type: 'journal_event'; id: number; timestamp: number; entityId: number; eventType: string; payload: string }
+  | { type: 'message_received'; id: number; from: number; to: number; payload: string; timestamp: number };

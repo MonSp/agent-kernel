@@ -59,6 +59,8 @@ add_executable(kernel_tests
     tests/test_tick_engine.cpp
     tests/test_simulation_runner.cpp
     tests/test_ipc_tick.cpp
+    tests/test_event_journal.cpp
+    tests/test_agent_mailbox.cpp
 )
 target_include_directories(kernel_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

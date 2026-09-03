@@ -1,29 +1,38 @@
 #include "ipc/AgentKernelBridge.h"
 #include "ecs/ComponentSchemas.h"
 #include "ecs/GenericComponentStore.h"
+#include "ecs/systems/EventStreamServer.h"
 #include <csignal>
 #include <cstdio>
 #include <cstring>
 #include <string>
 
 static IPC::AgentKernelBridge* g_bridge = nullptr;
+static Systems::EventStreamServer* g_eventStream = nullptr;
 
 static void signalHandler(int /*sig*/) {
     if (g_bridge) {
         printf("\nShutting down agent-kernel-daemon...\n");
         g_bridge->stop();
     }
+    if (g_eventStream) {
+        g_eventStream->stop();
+    }
 }
 
 int main(int argc, char* argv[]) {
     std::string socketPath = "/tmp/agent-kernel.sock";
+    std::string eventsSocketPath;  // empty = no event stream
 
     for (int i = 1; i < argc; ++i) {
         if ((strcmp(argv[i], "--socket") == 0 || strcmp(argv[i], "-s") == 0) && i + 1 < argc) {
             socketPath = argv[++i];
+        } else if (strcmp(argv[i], "--events-socket") == 0 && i + 1 < argc) {
+            eventsSocketPath = argv[++i];
         } else if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            printf("Usage: %s [--socket <path>]\n", argv[0]);
-            printf("  --socket, -s  Unix socket path (default: /tmp/agent-kernel.sock)\n");
+            printf("Usage: %s [--socket <path>] [--events-socket <path>]\n", argv[0]);
+            printf("  --socket, -s         IPC socket path (default: /tmp/agent-kernel.sock)\n");
+            printf("  --events-socket      Event stream socket path (optional)\n");
             return 0;
         }
     }
@@ -53,9 +62,28 @@ int main(int argc, char* argv[]) {
     ECS::initDynamicRegistryFromSchemas();
     printf("Initialized dynamic component stores for hybrid registry.\n");
 
+    // Start event stream server if requested
+    if (!eventsSocketPath.empty()) {
+        auto* stream = new Systems::EventStreamServer(
+            eventsSocketPath, bridge.journal(), bridge.mailbox());
+        if (stream->start()) {
+            g_eventStream = stream;
+            printf("Event stream server listening on %s\n", eventsSocketPath.c_str());
+        } else {
+            fprintf(stderr, "Failed to start event stream on %s\n", eventsSocketPath.c_str());
+            delete stream;
+        }
+    }
+
     // Block until stopped by signal
     while (bridge.isRunning()) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
+    if (g_eventStream) {
+        g_eventStream->stop();
+        delete g_eventStream;
+        g_eventStream = nullptr;
     }
 
     printf("agent-kernel-daemon stopped.\n");
