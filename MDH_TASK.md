@@ -9,38 +9,39 @@ updated: 2026-09-16
 ## Report
 
 ### Round 1 (fe4101b) — Initial improvements
-- DecisionEngine: unordered_map enum lookup, shared JSON escape utility
+- DecisionEngine: unordered_map enum lookup, shared JSON escape
 - HttpClient: size limits, NOSIGNAL thread safety
 - TickEngine: pre-allocated string serialization
 
-### Round 2 (this commit) — Review feedback fixes
+### Round 2 (f7ed74b) — Review feedback fixes
+- Restored deleted comments
+- Removed ineffective TCP_KEEPALIVE (no connection pool)
+- Removed FOLLOWLOCATION (unnecessary SSRF surface)
+- Fixed TickEngine double toJson() call
 
-**Code review findings addressed:**
+### Round 3 (this commit) — Deduplication + consistency
 
-1. **Deleted comments restored** — DecisionEngine.cpp: all explanatory comments
-   brought back (`// Parse action`, `// Clamp to [0, 1]`, `// unmatched braces`,
-   step numbers in `decide()`, etc.)
+**Problem:** JSON helper functions were duplicated across 3 files with
+inconsistent behavior:
+- `DecisionEngine.cpp`: `appendJsonEscaped` — missing `\b`, `\f`, `\uXXXX`
+- `LLMClient.cpp`: `jsonEscape` — had all escape sequences
+- `TickEngine.cpp`: `escapeJsonStr` — missing `\b`, `\f`, `\uXXXX`
 
-2. **TCP_KEEPALIVE removed** — The curl handle is created/destroyed per request
-   (`curl_easy_init`/`curl_easy_cleanup`), so TCP keepalive parameters have no
-   effect. Real connection reuse would require a handle pool (curl_multi or
-   persistent handle cache) — that's an architecture change, not a config tweak.
+**Fix:** Created `src/llm/JsonUtils.h` as single source of truth:
+- `appendEscaped()` / `escape()` — full escape incl. `\b`, `\f`, `\uXXXX`
+- `findString()` / `findInt()` / `findFloat()` — JSON value extraction
+- `extractObject()` — balanced-brace JSON object extraction
 
-3. **FOLLOWLOCATION removed** — LLM API endpoints don't return redirects.
-   Following redirects adds SSRF attack surface with zero benefit.
+**Updated files:**
+- `DecisionEngine.cpp`: uses JsonUtils (removed 3 duplicate functions)
+- `LLMClient.cpp`: uses JsonUtils (removed 2 duplicate functions), `buildRequestBody` now uses `std::string` + `reserve` instead of `ostringstream`
+- `TickEngine.cpp`: uses JsonUtils (removed duplicate escape function)
 
-4. **TickEngine double toJson() call fixed** — `decision.toJson()` was called
-   twice (once in `reserve()`, once in concatenation). Now serialized once
-   into a local variable.
-
-**What was kept from Round 1:**
-- unordered_map enum lookup (real O(1) improvement + maintainability)
-- Shared JSON escape utility (fixes missing \n/\r/\t in delegateTo/details)
-- Size limits + NOSIGNAL (real safety/threading fixes)
-- std::string + reserve serialization (micro-optimization, kept)
+**Net effect:** 3 inconsistent escape implementations → 1 correct one.
+LLMClient's superior version (with `\b`/`\f`/`\uXXXX`) is now canonical.
 
 ## Tasks
-- [x] T1: Restore deleted comments
-- [x] T2: Remove TCP_KEEPALIVE (ineffective without connection pool)
-- [x] T3: Remove FOLLOWLOCATION (unnecessary SSRF surface)
-- [x] T4: Fix TickEngine double toJson() call
+- [x] T1: Create shared JsonUtils.h
+- [x] T2: Migrate DecisionEngine to JsonUtils
+- [x] T3: Migrate LLMClient to JsonUtils + fix serialization
+- [x] T4: Migrate TickEngine to JsonUtils

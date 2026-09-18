@@ -1,26 +1,7 @@
 #include "TickEngine.h"
+#include "../../llm/JsonUtils.h"
 #include <chrono>
 #include <string>
-
-namespace {
-
-std::string escapeJsonStr(const std::string& s) {
-    std::string out;
-    out.reserve(s.size() + 8);
-    for (char c : s) {
-        switch (c) {
-            case '"':  out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n";  break;
-            case '\r': out += "\\r";  break;
-            case '\t': out += "\\t";  break;
-            default:   out += c;      break;
-        }
-    }
-    return out;
-}
-
-} // anonymous namespace
 
 namespace Systems {
 
@@ -66,10 +47,10 @@ std::string TickResult::toJson() const {
         if (i > 0) out += ",";
         out += "{\"target\":" + std::to_string(static_cast<int>(effects[i].target));
         out += ",\"fieldName\":\"";
-        out += escapeJsonStr(effects[i].fieldName);
+        JsonUtils::appendEscaped(out, effects[i].fieldName);
         out += "\",\"delta\":" + std::to_string(effects[i].delta);
         out += ",\"description\":\"";
-        out += escapeJsonStr(effects[i].description);
+        JsonUtils::appendEscaped(out, effects[i].description);
         out += "\"}";
     }
     out += "]}";
