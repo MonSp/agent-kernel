@@ -4,39 +4,36 @@ status: delivered
 updated: 2026-09-16
 ---
 
-# MDH Task: agent-kernel CI + Coverage Gate
-
-## CI Workflow
-
-Added `.github/workflows/ci.yml`:
-- Build with coverage flags (--coverage -O0 -g)
-- Run full test suite (285 tests)
-- gcovr coverage gate: fail if line coverage < 80%
-- Per-file coverage report on failure
-- Excludes main.cpp (daemon entry point, not unit-testable)
+# MDH Task: agent-kernel Coverage Detail Tests
 
 ## Coverage Results
 
-| Metric | Value |
-|--------|-------|
-| Line coverage | 83.4% (2919/3498) |
-| Function coverage | 93.6% (247/264) |
-| Threshold | 80% |
-| Status | PASS |
+| Module | Before | After | Change |
+|--------|--------|-------|--------|
+| SocialComponent.h | 64% | 77% | +13% |
+| EntityArchetype.h | 66% | 73% | +7% |
+| SchemaValidator.h | 73% | 73% | — (different compilation units) |
+| **TOTAL** | **83.4%** | **83.9%** | **+0.5%** |
 
-## Test Coverage Additions
+## Tests Added (13)
 
-**EventStreamServer (9 tests):**
-- Start/stop lifecycle, invalid path, double stop
-- Single/multiple subscriber management
-- Journal event push, mailbox message push
-- JSON serialization (escape, payload embedding)
+**EntityArchetype applyDefaults type branches (6):**
+- Int32 (hp/maxHp/power/xp), Uint8 (careerLevel), Float (ambition/caution)
+- Uint32 (totalXp), Int64 (birthTime), Mixed types in one archetype
 
-**Coverage gap fill (13 tests):**
-- Component type IDs
-- SchemaValidator toJson/validate
-- EntityArchetype applyDefaults
-- EventJournal edge cases
+**SocialComponent cooldown system (3):**
+- addCooldown fill all slots
+- Reuse expired cooldown slot
+- LRU eviction when full
+
+**SchemaValidator field-type validation (4):**
+- Float min/max violations (PersonalityComponent)
+- Int32 min/max violations (StatsComponent)
+- Valid float values pass
+- Multiple simultaneous violations (4 fields)
+
+## CI Status
+CI passed (4a432b8): coverage gate 80% met at 83.9%.
 
 ## Full Test Results
-285 tests passed, 0 failed.
+299 tests passed, 0 failed.
