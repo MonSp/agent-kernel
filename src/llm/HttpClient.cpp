@@ -9,6 +9,10 @@ int HttpClient::timeoutSec_ = 30;
 int HttpClient::mockStatusCode_ = 200;
 std::string HttpClient::mockBody_;
 
+// Request/response size limits (safety guardrails)
+static const size_t MAX_REQUEST_SIZE  = 10 * 1024 * 1024;   // 10 MB
+static const size_t MAX_RESPONSE_SIZE = 10 * 1024 * 1024;   // 10 MB
+
 void HttpClient::setTimeout(int seconds) {
     timeoutSec_ = seconds;
 }
@@ -26,11 +30,20 @@ void HttpClient::setMockResponse(int statusCode, const std::string& body) {
 #include <curl/curl.h>
 
 namespace {
-    // Callback: append received data to a std::string.
+    struct WriteContext {
+        std::string* out;
+        size_t max_size;
+    };
+
+    // Callback: append received data to a std::string, with size limit.
     size_t writeCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
-        auto* out = static_cast<std::string*>(userdata);
-        out->append(ptr, size * nmemb);
-        return size * nmemb;
+        auto* ctx = static_cast<WriteContext*>(userdata);
+        size_t total = size * nmemb;
+        if (ctx->out->size() + total > ctx->max_size) {
+            return 0;  // Abort — response too large
+        }
+        ctx->out->append(ptr, total);
+        return total;
     }
 }
 
@@ -38,6 +51,13 @@ HttpResponse HttpClient::post(const std::string& url,
                               const std::string& jsonBody,
                               const std::vector<std::pair<std::string,std::string>>& headers) {
     HttpResponse resp;
+
+    // Guard: reject oversized requests
+    if (jsonBody.size() > MAX_REQUEST_SIZE) {
+        resp.statusCode = 413;
+        resp.body = "Request body exceeds maximum size (10 MB)";
+        return resp;
+    }
 
     CURL* curl = curl_easy_init();
     if (!curl) {
@@ -47,6 +67,7 @@ HttpResponse HttpClient::post(const std::string& url,
     }
 
     std::string responseBuffer;
+    WriteContext ctx{&responseBuffer, MAX_RESPONSE_SIZE};
 
     struct curl_slist* chunk = nullptr;
     chunk = curl_slist_append(chunk, "Content-Type: application/json");
@@ -60,9 +81,21 @@ HttpResponse HttpClient::post(const std::string& url,
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, jsonBody.c_str());
     curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, (long)jsonBody.size());
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &responseBuffer);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &ctx);
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)timeoutSec_);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, (long)timeoutSec_);
+
+    // Connection reuse: enable TCP keepalive
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPIDLE, 30L);
+    curl_easy_setopt(curl, CURLOPT_TCP_KEEPINTVL, 15L);
+
+    // Thread safety: don't use signals (important for multi-threaded servers)
+    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
+
+    // Follow redirects (up to 3)
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
 
     CURLcode res = curl_easy_perform(curl);
     if (res == CURLE_OK) {
@@ -70,6 +103,9 @@ HttpResponse HttpClient::post(const std::string& url,
         curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
         resp.statusCode = (int)code;
         resp.body = responseBuffer;
+    } else if (res == CURLE_WRITE_ERROR) {
+        resp.statusCode = 502;
+        resp.body = "Response exceeds maximum size (10 MB)";
     } else {
         resp.statusCode = 0;
         resp.body = std::string("curl error: ") + curl_easy_strerror(res);

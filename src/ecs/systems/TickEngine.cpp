@@ -1,6 +1,6 @@
 #include "TickEngine.h"
 #include <chrono>
-#include <sstream>
+#include <string>
 
 namespace {
 
@@ -48,21 +48,29 @@ TickResult TickEngine::tick(ECS::Registry& reg, ECS::EntityId id, const std::str
 }
 
 std::string TickResult::toJson() const {
-    std::ostringstream oss;
-    oss << "{\"action\":\"" << actionTypeToString(action) << "\"";
-    oss << ",\"tickNumber\":" << tickNumber;
-    oss << ",\"timestamp\":" << timestamp;
-    oss << ",\"decision\":" << decision.toJson();
-    oss << ",\"effects\":[";
+    // Pre-reserve capacity: base + ~40 bytes per effect + decision JSON
+    std::string out;
+    out.reserve(128 + effects.size() * 80 + decision.toJson().size());
+
+    out += "{\"action\":\"";
+    out += actionTypeToString(action);
+    out += "\",\"tickNumber\":" + std::to_string(tickNumber);
+    out += ",\"timestamp\":" + std::to_string(timestamp);
+    out += ",\"decision\":" + decision.toJson();
+    out += ",\"effects\":[";
+
     for (size_t i = 0; i < effects.size(); ++i) {
-        if (i > 0) oss << ",";
-        oss << "{\"target\":" << static_cast<int>(effects[i].target);
-        oss << ",\"fieldName\":\"" << escapeJsonStr(effects[i].fieldName) << "\"";
-        oss << ",\"delta\":" << effects[i].delta;
-        oss << ",\"description\":\"" << escapeJsonStr(effects[i].description) << "\"}";
+        if (i > 0) out += ",";
+        out += "{\"target\":" + std::to_string(static_cast<int>(effects[i].target));
+        out += ",\"fieldName\":\"";
+        out += escapeJsonStr(effects[i].fieldName);
+        out += "\",\"delta\":" + std::to_string(effects[i].delta);
+        out += ",\"description\":\"";
+        out += escapeJsonStr(effects[i].description);
+        out += "\"}";
     }
-    oss << "]}";
-    return oss.str();
+    out += "]}";
+    return out;
 }
 
 } // namespace Systems
