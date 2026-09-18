@@ -48,15 +48,18 @@ TickResult TickEngine::tick(ECS::Registry& reg, ECS::EntityId id, const std::str
 }
 
 std::string TickResult::toJson() const {
-    // Pre-reserve capacity: base + ~40 bytes per effect + decision JSON
+    // Serialize decision once — reuse for both reserve() and concatenation
+    const std::string decisionJson = decision.toJson();
+
+    // Pre-reserve capacity: base + ~80 bytes per effect + decision JSON
     std::string out;
-    out.reserve(128 + effects.size() * 80 + decision.toJson().size());
+    out.reserve(128 + effects.size() * 80 + decisionJson.size());
 
     out += "{\"action\":\"";
     out += actionTypeToString(action);
     out += "\",\"tickNumber\":" + std::to_string(tickNumber);
     out += ",\"timestamp\":" + std::to_string(timestamp);
-    out += ",\"decision\":" + decision.toJson();
+    out += ",\"decision\":" + decisionJson;
     out += ",\"effects\":[";
 
     for (size_t i = 0; i < effects.size(); ++i) {

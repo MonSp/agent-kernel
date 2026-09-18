@@ -36,6 +36,7 @@ namespace {
     };
 
     // Callback: append received data to a std::string, with size limit.
+    // Returns 0 to abort when response exceeds max_size.
     size_t writeCallback(char* ptr, size_t size, size_t nmemb, void* userdata) {
         auto* ctx = static_cast<WriteContext*>(userdata);
         size_t total = size * nmemb;
@@ -85,17 +86,8 @@ HttpResponse HttpClient::post(const std::string& url,
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, (long)timeoutSec_);
     curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, (long)timeoutSec_);
 
-    // Connection reuse: enable TCP keepalive
-    curl_easy_setopt(curl, CURLOPT_TCP_KEEPALIVE, 1L);
-    curl_easy_setopt(curl, CURLOPT_TCP_KEEPIDLE, 30L);
-    curl_easy_setopt(curl, CURLOPT_TCP_KEEPINTVL, 15L);
-
     // Thread safety: don't use signals (important for multi-threaded servers)
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-
-    // Follow redirects (up to 3)
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl, CURLOPT_MAXREDIRS, 3L);
 
     CURLcode res = curl_easy_perform(curl);
     if (res == CURLE_OK) {

@@ -2,47 +2,45 @@
 feature: agent-kernel-improvement
 status: delivered
 updated: 2026-09-16
-branch: improvement/mdh-round1
 ---
 
 # MDH Task: agent-kernel Multi-Round Improvement
 
 ## Report
 
-**What was built** — MDH analyzed agent-kernel source code and executed 3 rounds of improvements:
+### Round 1 (fe4101b) — Initial improvements
+- DecisionEngine: unordered_map enum lookup, shared JSON escape utility
+- HttpClient: size limits, NOSIGNAL thread safety
+- TickEngine: pre-allocated string serialization
 
-**Round 1 — DecisionEngine optimization:**
-- `actionFromString`: sequential if-chain (O(n)) → `std::unordered_map` lookup (O(1))
-- `Decision::toJson`: ostringstream with per-char escaping → pre-allocated `std::string` + shared `appendJsonEscaped` utility
-- Eliminated 3 duplicate JSON escaping implementations
+### Round 2 (this commit) — Review feedback fixes
 
-**Round 3 — HttpClient hardening:**
-- Added `CURLOPT_TCP_KEEPALIVE` for connection reuse (reduces latency for repeated LLM calls)
-- Added `CURLOPT_NOSIGNAL` for thread safety in multi-threaded servers
-- Added `CURLOPT_FOLLOWLOCATION` + `CURLOPT_MAXREDIRS` for redirect handling
-- Added request/response size limits (10 MB) with proper error codes (413/502)
+**Code review findings addressed:**
 
-**Round 4 — TickEngine serialization:**
-- `TickResult::toJson`: ostringstream → pre-allocated `std::string` with capacity hints
-- Numeric fields use `std::to_string` instead of stream insertion
-- Pre-reserve based on effects count to minimize allocations
+1. **Deleted comments restored** — DecisionEngine.cpp: all explanatory comments
+   brought back (`// Parse action`, `// Clamp to [0, 1]`, `// unmatched braces`,
+   step numbers in `decide()`, etc.)
 
-**Verification** — Build passes, 0 new test failures (17 pre-existing IPC tests require running daemon).
+2. **TCP_KEEPALIVE removed** — The curl handle is created/destroyed per request
+   (`curl_easy_init`/`curl_easy_cleanup`), so TCP keepalive parameters have no
+   effect. Real connection reuse would require a handle pool (curl_multi or
+   persistent handle cache) — that's an architecture change, not a config tweak.
 
-## [S1] Problem
-agent-kernel had code quality and performance issues identified by MDH's RSI analysis pipeline.
+3. **FOLLOWLOCATION removed** — LLM API endpoints don't return redirects.
+   Following redirects adds SSRF attack surface with zero benefit.
 
-## [S2] Design
-See Report section above for each round's changes.
+4. **TickEngine double toJson() call fixed** — `decision.toJson()` was called
+   twice (once in `reserve()`, once in concatenation). Now serialized once
+   into a local variable.
 
-## [S3] Out of Scope
-- External dependencies (nlohmann/json)
-- Architecture changes
-- IPC protocol changes
+**What was kept from Round 1:**
+- unordered_map enum lookup (real O(1) improvement + maintainability)
+- Shared JSON escape utility (fixes missing \n/\r/\t in delegateTo/details)
+- Size limits + NOSIGNAL (real safety/threading fixes)
+- std::string + reserve serialization (micro-optimization, kept)
 
 ## Tasks
-- [x] T1: DecisionEngine unordered_map enum mapping
-- [x] T2: Shared JSON escape utility
-- [x] T3: DecisionEngine parser robustness (included in T1 rewrite)
-- [x] T4: HttpClient connection reuse + limits
-- [x] T5: TickEngine serialization optimization
+- [x] T1: Restore deleted comments
+- [x] T2: Remove TCP_KEEPALIVE (ineffective without connection pool)
+- [x] T3: Remove FOLLOWLOCATION (unnecessary SSRF surface)
+- [x] T4: Fix TickEngine double toJson() call
