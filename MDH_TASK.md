@@ -8,40 +8,50 @@ updated: 2026-09-16
 
 ## Report
 
-### Round 1 (fe4101b) — Initial improvements
-- DecisionEngine: unordered_map enum lookup, shared JSON escape
-- HttpClient: size limits, NOSIGNAL thread safety
-- TickEngine: pre-allocated string serialization
+### Rounds 1-3 — Code quality improvements
+- Round 1 (fe4101b): enum O(1) lookup, shared JSON escape, HttpClient hardening
+- Round 2 (f7ed74b): Review fixes — restore comments, remove ineffective options
+- Round 3 (253ccd8): JsonUtils.h deduplication — 3 inconsistent escape impls → 1
 
-### Round 2 (f7ed74b) — Review feedback fixes
-- Restored deleted comments
-- Removed ineffective TCP_KEEPALIVE (no connection pool)
-- Removed FOLLOWLOCATION (unnecessary SSRF surface)
-- Fixed TickEngine double toJson() call
+### Round 4 — Unit tests for JsonUtils (new shared module)
 
-### Round 3 (this commit) — Deduplication + consistency
+**32 tests covering all JsonUtils.h public functions:**
 
-**Problem:** JSON helper functions were duplicated across 3 files with
-inconsistent behavior:
-- `DecisionEngine.cpp`: `appendJsonEscaped` — missing `\b`, `\f`, `\uXXXX`
-- `LLMClient.cpp`: `jsonEscape` — had all escape sequences
-- `TickEngine.cpp`: `escapeJsonStr` — missing `\b`, `\f`, `\uXXXX`
+Escaping (7 tests):
+- Quotes, backslash, control chars (\n \r \t \b \f)
+- Low control chars (\x01 → \u0001)
+- Empty string, normal text
+- Incremental appendEscaped
 
-**Fix:** Created `src/llm/JsonUtils.h` as single source of truth:
-- `appendEscaped()` / `escape()` — full escape incl. `\b`, `\f`, `\uXXXX`
-- `findString()` / `findInt()` / `findFloat()` — JSON value extraction
-- `extractObject()` — balanced-brace JSON object extraction
+findString (7 tests):
+- Basic, missing key, empty value
+- Escaped values (\n \" \t)
+- Whitespace around key/value
+- Nested keys, non-string values
 
-**Updated files:**
-- `DecisionEngine.cpp`: uses JsonUtils (removed 3 duplicate functions)
-- `LLMClient.cpp`: uses JsonUtils (removed 2 duplicate functions), `buildRequestBody` now uses `std::string` + `reserve` instead of `ostringstream`
-- `TickEngine.cpp`: uses JsonUtils (removed duplicate escape function)
+findInt (4 tests):
+- Basic, negative, missing key, non-numeric, whitespace
 
-**Net effect:** 3 inconsistent escape implementations → 1 correct one.
-LLMClient's superior version (with `\b`/`\f`/`\uXXXX`) is now canonical.
+findFloat (5 tests):
+- Basic, negative, integer, missing key, non-numeric
+
+extractObject (6 tests):
+- Simple, nested, no braces, unmatched, multiple objects, empty
+
+Round-trip (2 tests):
+- escape → findString preserves original
+- Unicode (你好世界) round-trip
+
+Edge cases (3 tests):
+- Key at end without value
+- Large number (no crash)
+- All special chars combined
+
+**Verification:** 32/32 tests pass (standalone run).
+Note: kernel_tests binary segfaults on pre-existing IPC tests
+(need running daemon) before reaching JsonUtils tests.
 
 ## Tasks
-- [x] T1: Create shared JsonUtils.h
-- [x] T2: Migrate DecisionEngine to JsonUtils
-- [x] T3: Migrate LLMClient to JsonUtils + fix serialization
-- [x] T4: Migrate TickEngine to JsonUtils
+- [x] T1: Create test_json_utils.cpp (32 tests)
+- [x] T2: Register in CMakeLists.txt + test runner
+- [x] T3: Verify all tests pass

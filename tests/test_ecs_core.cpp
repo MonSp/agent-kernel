@@ -110,6 +110,7 @@ extern void runSimulationRunnerTests();
 extern void runIpcTickTests();
 extern void runEventJournalTests();
 extern void runAgentMailboxTests();
+extern void runJsonUtilsTests();
 
 int main() {
     printf("Running agent-kernel ECS core tests...\n");
@@ -186,6 +187,9 @@ int main() {
 
     printf("\n");
     runAgentMailboxTests();
+
+    printf("\n");
+    runJsonUtilsTests();
 
     printf("\nAll tests PASSED.\n");
     return 0;
