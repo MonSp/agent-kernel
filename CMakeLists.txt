@@ -65,6 +65,7 @@ add_executable(kernel_tests
     tests/test_http_client_unit.cpp
     tests/test_simulation_runner_unit.cpp
     tests/test_coverage_gaps.cpp
+    tests/test_event_stream_server.cpp
 )
 target_include_directories(kernel_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

@@ -114,6 +114,7 @@ extern void runJsonUtilsTests();
 extern void runHttpClientTests();
 extern void runSimulationRunnerUnitTests();
 extern void runCoverageGapTests();
+extern void runEventStreamServerTests();
 
 int main() {
     printf("Running agent-kernel ECS core tests...\n");
@@ -202,6 +203,9 @@ int main() {
 
     printf("\n");
     runCoverageGapTests();
+
+    printf("\n");
+    runEventStreamServerTests();
 
     printf("\nAll tests PASSED.\n");
     return 0;

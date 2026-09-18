@@ -4,46 +4,39 @@ status: delivered
 updated: 2026-09-16
 ---
 
-# MDH Task: agent-kernel Multi-Round Improvement
+# MDH Task: agent-kernel CI + Coverage Gate
 
-## Coverage Report + Gap Fill
+## CI Workflow
 
-### Coverage analysis (gcov, best-per-file)
+Added `.github/workflows/ci.yml`:
+- Build with coverage flags (--coverage -O0 -g)
+- Run full test suite (285 tests)
+- gcovr coverage gate: fail if line coverage < 80%
+- Per-file coverage report on failure
+- Excludes main.cpp (daemon entry point, not unit-testable)
 
-| Module | Coverage | Gap |
-|--------|----------|-----|
-| Component.h | 27.3% | Template methods not instantiated |
-| EntityArchetype.h | 64.2% | applyDefaults not tested |
-| AgentKernelBridge.h | 69.7% | Many IPC endpoints untested |
-| EventJournal.h | 70.9% | Edge cases untested |
-| SchemaValidator.h | 73.1% | toJson/validate untested |
-| Schema.h | 80.9% | Partial |
-| JsonUtils.h | 91.1% | Good |
-| DecisionEngine.cpp | 96.4% | Good |
-| LLMClient.cpp | 95.3% | Good |
-| TickEngine.cpp | 97.4% | Good |
+## Coverage Results
 
-### Gap fill: 13 new tests
+| Metric | Value |
+|--------|-------|
+| Line coverage | 83.4% (2919/3498) |
+| Function coverage | 93.6% (247/264) |
+| Threshold | 80% |
+| Status | PASS |
 
-**Component type IDs (3):**
-- generateComponentTypeId unique incrementing
-- Component<T>::getStaticTypeId unique per type
-- IComponent virtual base
+## Test Coverage Additions
 
-**SchemaValidator (4):**
-- ValidationResult.toJson valid/invalid
-- ComponentSchema::validate pass/fail
-- Violation detection for out-of-range values
+**EventStreamServer (9 tests):**
+- Start/stop lifecycle, invalid path, double stop
+- Single/multiple subscriber management
+- Journal event push, mailbox message push
+- JSON serialization (escape, payload embedding)
 
-**EntityArchetype applyDefaults (3):**
-- Default values applied to Stats/Personality
-- Numeric field parsing
-- Invalid field gracefully ignored
+**Coverage gap fill (13 tests):**
+- Component type IDs
+- SchemaValidator toJson/validate
+- EntityArchetype applyDefaults
+- EventJournal edge cases
 
-**EventJournal edge cases (3):**
-- Ring buffer overflow (200 events)
-- Query by type
-- Clear and reuse
-
-### Full test results
-275 tests passed, 0 failed.
+## Full Test Results
+285 tests passed, 0 failed.
