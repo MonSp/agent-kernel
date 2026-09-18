@@ -113,6 +113,7 @@ extern void runAgentMailboxTests();
 extern void runJsonUtilsTests();
 extern void runHttpClientTests();
 extern void runSimulationRunnerUnitTests();
+extern void runCoverageGapTests();
 
 int main() {
     printf("Running agent-kernel ECS core tests...\n");
@@ -198,6 +199,9 @@ int main() {
 
     printf("\n");
     runSimulationRunnerUnitTests();
+
+    printf("\n");
+    runCoverageGapTests();
 
     printf("\nAll tests PASSED.\n");
     return 0;

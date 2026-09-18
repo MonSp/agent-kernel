@@ -6,33 +6,44 @@ updated: 2026-09-16
 
 # MDH Task: agent-kernel Multi-Round Improvement
 
-## Report
+## Coverage Report + Gap Fill
 
-### Segfault fix
-Root cause: CMake Release build adds `-DNDEBUG`, which compiles out `assert()`.
-Tests continued executing after failed assertions, eventually crashing on
-invalid state (e.g., sending on fd=-1 after failed socket connect).
+### Coverage analysis (gcov, best-per-file)
 
-Fix:
-- `CMakeLists.txt`: `target_compile_options(kernel_tests PRIVATE -UNDEBUG)`
-- `test_ipc.cpp`: `assertContains` now calls `abort()` instead of `assert(false)`
+| Module | Coverage | Gap |
+|--------|----------|-----|
+| Component.h | 27.3% | Template methods not instantiated |
+| EntityArchetype.h | 64.2% | applyDefaults not tested |
+| AgentKernelBridge.h | 69.7% | Many IPC endpoints untested |
+| EventJournal.h | 70.9% | Edge cases untested |
+| SchemaValidator.h | 73.1% | toJson/validate untested |
+| Schema.h | 80.9% | Partial |
+| JsonUtils.h | 91.1% | Good |
+| DecisionEngine.cpp | 96.4% | Good |
+| LLMClient.cpp | 95.3% | Good |
+| TickEngine.cpp | 97.4% | Good |
 
-### Test coverage additions
+### Gap fill: 13 new tests
 
-**JsonUtils (32 tests):** escape, findString, findInt, findFloat, extractObject,
-round-trip, edge cases.
+**Component type IDs (3):**
+- generateComponentTypeId unique incrementing
+- Component<T>::getStaticTypeId unique per type
+- IComponent virtual base
 
-**HttpClient unit (10 tests):** mock response custom/reset/empty, HttpResponse.ok()
-boundary (200/299/300/404/500/0), empty body, headers, large body, timeout,
-sequential requests.
+**SchemaValidator (4):**
+- ValidationResult.toJson valid/invalid
+- ComponentSchema::validate pass/fail
+- Violation detection for out-of-range values
 
-**SimulationRunner unit (10 tests):** empty entity list, zero ticks, empty tasks,
-tick numbering, summary statistics, action counts, confidence range, JSON output,
-low energy agent, 10-entity batch.
+**EntityArchetype applyDefaults (3):**
+- Default values applied to Stats/Personality
+- Numeric field parsing
+- Invalid field gracefully ignored
+
+**EventJournal edge cases (3):**
+- Ring buffer overflow (200 events)
+- Query by type
+- Clear and reuse
 
 ### Full test results
-261 tests passed, 0 failed, exit code 0.
-Modules covered: ECS core, components, IPC bridge, schema, dynamic store,
-hybrid registry, archetype, validation, LLM, PromptBuilder, DecisionEngine,
-action types/effects/executor, TickEngine, SimulationRunner, IPC tick,
-EventJournal, AgentMailbox, JsonUtils, HttpClient.
+275 tests passed, 0 failed.
