@@ -8,50 +8,31 @@ updated: 2026-09-16
 
 ## Report
 
-### Rounds 1-3 — Code quality improvements
-- Round 1 (fe4101b): enum O(1) lookup, shared JSON escape, HttpClient hardening
-- Round 2 (f7ed74b): Review fixes — restore comments, remove ineffective options
-- Round 3 (253ccd8): JsonUtils.h deduplication — 3 inconsistent escape impls → 1
+### Segfault fix
+Root cause: CMake Release build adds `-DNDEBUG`, which compiles out `assert()`.
+Tests continued executing after failed assertions, eventually crashing on
+invalid state (e.g., sending on fd=-1 after failed socket connect).
 
-### Round 4 — Unit tests for JsonUtils (new shared module)
+Fix:
+- `CMakeLists.txt`: `target_compile_options(kernel_tests PRIVATE -UNDEBUG)`
+- `test_ipc.cpp`: `assertContains` now calls `abort()` instead of `assert(false)`
 
-**32 tests covering all JsonUtils.h public functions:**
+### Test coverage additions
 
-Escaping (7 tests):
-- Quotes, backslash, control chars (\n \r \t \b \f)
-- Low control chars (\x01 → \u0001)
-- Empty string, normal text
-- Incremental appendEscaped
+**JsonUtils (32 tests):** escape, findString, findInt, findFloat, extractObject,
+round-trip, edge cases.
 
-findString (7 tests):
-- Basic, missing key, empty value
-- Escaped values (\n \" \t)
-- Whitespace around key/value
-- Nested keys, non-string values
+**HttpClient unit (10 tests):** mock response custom/reset/empty, HttpResponse.ok()
+boundary (200/299/300/404/500/0), empty body, headers, large body, timeout,
+sequential requests.
 
-findInt (4 tests):
-- Basic, negative, missing key, non-numeric, whitespace
+**SimulationRunner unit (10 tests):** empty entity list, zero ticks, empty tasks,
+tick numbering, summary statistics, action counts, confidence range, JSON output,
+low energy agent, 10-entity batch.
 
-findFloat (5 tests):
-- Basic, negative, integer, missing key, non-numeric
-
-extractObject (6 tests):
-- Simple, nested, no braces, unmatched, multiple objects, empty
-
-Round-trip (2 tests):
-- escape → findString preserves original
-- Unicode (你好世界) round-trip
-
-Edge cases (3 tests):
-- Key at end without value
-- Large number (no crash)
-- All special chars combined
-
-**Verification:** 32/32 tests pass (standalone run).
-Note: kernel_tests binary segfaults on pre-existing IPC tests
-(need running daemon) before reaching JsonUtils tests.
-
-## Tasks
-- [x] T1: Create test_json_utils.cpp (32 tests)
-- [x] T2: Register in CMakeLists.txt + test runner
-- [x] T3: Verify all tests pass
+### Full test results
+261 tests passed, 0 failed, exit code 0.
+Modules covered: ECS core, components, IPC bridge, schema, dynamic store,
+hybrid registry, archetype, validation, LLM, PromptBuilder, DecisionEngine,
+action types/effects/executor, TickEngine, SimulationRunner, IPC tick,
+EventJournal, AgentMailbox, JsonUtils, HttpClient.

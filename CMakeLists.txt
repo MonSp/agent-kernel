@@ -62,12 +62,16 @@ add_executable(kernel_tests
     tests/test_event_journal.cpp
     tests/test_agent_mailbox.cpp
     tests/test_json_utils.cpp
+    tests/test_http_client_unit.cpp
+    tests/test_simulation_runner_unit.cpp
 )
 target_include_directories(kernel_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 target_link_libraries(kernel_tests PRIVATE agent-kernel pthread)
+# Tests need asserts to be active — strip NDEBUG added by Release build
+target_compile_options(kernel_tests PRIVATE -UNDEBUG)
 
 # Daemon executable
 add_executable(agent-kernel-daemon

@@ -72,7 +72,7 @@ private:
 static void assertContains(const std::string& haystack, const std::string& needle, const char* testName) {
     if (haystack.find(needle) == std::string::npos) {
         fprintf(stderr, "FAIL [%s]: expected '%s' in response: %s\n", testName, needle.c_str(), haystack.c_str());
-        assert(false);
+        abort();  // Stop immediately — don't continue with invalid state
     }
 }
 
