@@ -71,6 +71,7 @@ add_executable(kernel_tests
     tests/test_coverage_boost.cpp
     tests/test_component_methods.cpp
     tests/test_bridge_ipc_coverage.cpp
+    tests/test_component_base.cpp
 )
 target_include_directories(kernel_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
