@@ -119,6 +119,7 @@ extern void runCoverageDetailTests();
 extern void runRegistrySchemaTests();
 extern void runCoverageBoostTests();
 extern void runComponentMethodTests();
+extern void runBridgeIpcTests();
 
 int main() {
     printf("Running agent-kernel ECS core tests...\n");
@@ -222,6 +223,9 @@ int main() {
 
     printf("\n");
     runComponentMethodTests();
+
+    printf("\n");
+    runBridgeIpcTests();
 
     printf("\nAll tests PASSED.\n");
     return 0;
