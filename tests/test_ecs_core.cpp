@@ -117,6 +117,8 @@ extern void runCoverageGapTests();
 extern void runEventStreamServerTests();
 extern void runCoverageDetailTests();
 extern void runRegistrySchemaTests();
+extern void runCoverageBoostTests();
+extern void runComponentMethodTests();
 
 int main() {
     printf("Running agent-kernel ECS core tests...\n");
@@ -214,6 +216,12 @@ int main() {
 
     printf("\n");
     runRegistrySchemaTests();
+
+    printf("\n");
+    runCoverageBoostTests();
+
+    printf("\n");
+    runComponentMethodTests();
 
     printf("\nAll tests PASSED.\n");
     return 0;

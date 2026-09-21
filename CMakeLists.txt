@@ -68,6 +68,8 @@ add_executable(kernel_tests
     tests/test_event_stream_server.cpp
     tests/test_coverage_detail.cpp
     tests/test_registry_schema.cpp
+    tests/test_coverage_boost.cpp
+    tests/test_component_methods.cpp
 )
 target_include_directories(kernel_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
