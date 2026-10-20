@@ -49,6 +49,15 @@ namespace Method {
     inline const std::string getEvents           = "getEvents";
     inline const std::string sendMessage         = "sendMessage";
     inline const std::string getMessages         = "getMessages";
+    // Program runtime (program-pivot shared kernel)
+    inline const std::string listPrograms              = "listPrograms";
+    inline const std::string getProgram                = "getProgram";
+    inline const std::string compileProgram            = "compileProgram";
+    inline const std::string matchProgram              = "matchProgram";
+    inline const std::string runProgram                = "runProgram";
+    inline const std::string promoteProgram            = "promoteProgram";
+    inline const std::string recordProgramValidation   = "recordProgramValidation";
+    inline const std::string appendProgramLineage      = "appendProgramLineage";
 } // namespace Method
 
 } // namespace IPC

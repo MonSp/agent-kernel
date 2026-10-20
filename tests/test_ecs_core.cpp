@@ -231,6 +231,10 @@ int main() {
     printf("\n");
     runComponentBaseTests();
 
+    printf("\n");
+    extern void runProgramLibraryTests();
+    runProgramLibraryTests();
+
     printf("\nAll tests PASSED.\n");
     return 0;
 }

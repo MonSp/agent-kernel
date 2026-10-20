@@ -22,6 +22,7 @@
 #include "../ecs/systems/SimulationRunner.h"
 #include "../ecs/systems/EventJournal.h"
 #include "../ecs/systems/AgentMailbox.h"
+#include "../program/ProgramLibrary.h"
 #include <string>
 #include <functional>
 #include <cstdio>
@@ -449,12 +450,16 @@ inline std::string agentToJson(ECS::EntityId entityId) {
 
 class AgentKernelBridge {
 public:
-    explicit AgentKernelBridge(const std::string& socketPath)
-        : server_(socketPath) {
+    explicit AgentKernelBridge(const std::string& socketPath,
+                               const std::string& programDir = "")
+        : programLib_(resolveProgramDir(programDir), resolvePythonBin()),
+          server_(socketPath) {
         server_.setRequestHandler([this](const std::string& raw) {
             return handleRequest(raw);
         });
     }
+
+    Program::ProgramLibrary& programs() { return programLib_; }
 
     bool start() { return server_.start(); }
     void stop()  { server_.stop(); }
@@ -464,7 +469,21 @@ public:
     Systems::AgentMailbox& mailbox() { return mailbox_; }
 
 private:
+    static std::string resolveProgramDir(const std::string& explicitDir) {
+        if (!explicitDir.empty()) return explicitDir;
+        const char* env = std::getenv("AGENT_KERNEL_PROGRAM_DIR");
+        if (env && env[0]) return env;
+        return "program_packs";
+    }
+
+    static std::string resolvePythonBin() {
+        const char* env = std::getenv("PROGRAM_PYTHON");
+        if (env && env[0]) return env;
+        return "python3";
+    }
+
     std::mutex handlerMutex_;  // C1 fix: serialize all IPC handler calls
+    Program::ProgramLibrary programLib_;
 
     std::string handleRequest(const std::string& raw) {
         std::lock_guard<std::mutex> lock(handlerMutex_);
@@ -496,6 +515,16 @@ private:
         if (method == Method::getEvents)          return handleGetEvents(raw);
         if (method == Method::sendMessage)        return handleSendMessage(raw);
         if (method == Method::getMessages)        return handleGetMessages(raw);
+        if (method == Method::listPrograms)        return handleListPrograms(raw);
+        if (method == Method::getProgram)          return handleGetProgram(raw);
+        if (method == Method::compileProgram)      return handleCompileProgram(raw);
+        if (method == Method::matchProgram)        return handleMatchProgram(raw);
+        if (method == Method::runProgram)          return handleRunProgram(raw);
+        if (method == Method::promoteProgram)      return handlePromoteProgram(raw);
+        if (method == Method::recordProgramValidation)
+            return handleRecordProgramValidation(raw);
+        if (method == Method::appendProgramLineage)
+            return handleAppendProgramLineage(raw);
 
         return json::error("unknown method: " + method);
     }
@@ -1157,6 +1186,159 @@ private:
         }
         resp += "],\"pending\":" + std::to_string(mailbox_.pendingCount(entityId)) + "}";
         return json::ok(resp);
+    }
+
+
+    // ── Program runtime ───────────────────────────────────────────
+
+    static std::vector<std::string> parseKeywordsArray(const std::string& raw) {
+        std::vector<std::string> out;
+        size_t i = 0;
+        while (i < raw.size()) {
+            if (raw[i] == '"') {
+                size_t j = i + 1;
+                std::string tok;
+                while (j < raw.size()) {
+                    if (raw[j] == '\\' && j + 1 < raw.size()) {
+                        tok.push_back(raw[j]);
+                        tok.push_back(raw[j + 1]);
+                        j += 2;
+                        continue;
+                    }
+                    if (raw[j] == '"') break;
+                    tok.push_back(raw[j]);
+                    ++j;
+                }
+                out.push_back(tok);
+                i = (j < raw.size()) ? j + 1 : j;
+            } else {
+                ++i;
+            }
+        }
+        return out;
+    }
+
+    static std::string unescapeCode(const std::string& s) {
+        std::string out;
+        for (size_t i = 0; i < s.size(); ++i) {
+            if (s[i] == '\\' && i + 1 < s.size()) {
+                char n = s[++i];
+                switch (n) {
+                    case 'n': out.push_back('\n'); break;
+                    case 'r': out.push_back('\r'); break;
+                    case 't': out.push_back('\t'); break;
+                    case '"': out.push_back('"'); break;
+                    case '\\': out.push_back('\\'); break;
+                    default: out.push_back(n); break;
+                }
+            } else {
+                out.push_back(s[i]);
+            }
+        }
+        return out;
+    }
+
+    std::string handleListPrograms(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        std::string status = json::getString(params, "status");
+        auto list = programLib_.list(status);
+        std::string resp = "{\"programs\":[";
+        for (size_t i = 0; i < list.size(); ++i) {
+            if (i) resp += ",";
+            resp += list[i].toJson();
+        }
+        resp += "]}";
+        return json::ok(resp);
+    }
+
+    std::string handleGetProgram(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        std::string id = json::getString(params, "programId");
+        if (id.empty()) return json::error("programId is required");
+        auto m = programLib_.get(id);
+        if (!m) return json::error("NOT_FOUND: " + id);
+        return json::ok(m->toJson());
+    }
+
+    std::string handleCompileProgram(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        std::string id = json::getString(params, "programId");
+        std::string version = json::getString(params, "version");
+        std::string desc = json::getString(params, "description");
+        std::string mainPy = unescapeCode(json::getString(params, "mainPy"));
+        std::string testPy = unescapeCode(json::getString(params, "testPy"));
+        std::string model = json::getString(params, "modelDependency");
+        auto kws = parseKeywordsArray(json::getRawValue(params, "keywords"));
+        try {
+            auto m = programLib_.compile(id, version, desc, kws, mainPy, testPy, model);
+            return json::ok(m.toJson());
+        } catch (const std::exception& e) {
+            return json::error(e.what());
+        }
+    }
+
+    std::string handleMatchProgram(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        std::string task = json::getString(params, "task");
+        std::string model = json::getString(params, "model");
+        int maxAge = json::getInt(params, "maxAgeDays", 30);
+        auto m = programLib_.match(task, model, maxAge);
+        if (!m) return json::ok("{\"matched\":false}");
+        return json::ok("{\"matched\":true,\"program\":" + m->toJson() + "}");
+    }
+
+    std::string handleRunProgram(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        std::string id = json::getString(params, "programId");
+        std::string payload = json::getRawValue(params, "payload");
+        int timeoutMs = json::getInt(params, "timeoutMs", 15000);
+        if (id.empty()) return json::error("programId is required");
+        auto r = programLib_.run(id, payload, timeoutMs);
+        std::string resp = "{\"ok\":";
+        resp += r.ok ? "true" : "false";
+        resp += ",\"timedOut\":" + std::string(r.timedOut ? "true" : "false");
+        resp += ",\"exitCode\":" + std::to_string(r.exitCode);
+        resp += ",\"durationMs\":" + std::to_string(r.durationMs);
+        resp += ",\"llmCalls\":0";
+        resp += ",\"stdout\":\"" + json::escape(r.stdoutText) + "\"";
+        resp += ",\"stderr\":\"" + json::escape(r.stderrText) + "\"";
+        resp += ",\"errorCode\":\"" + json::escape(r.errorCode) + "\"}";
+        return json::ok(resp);
+    }
+
+    std::string handlePromoteProgram(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        std::string id = json::getString(params, "programId");
+        std::string model = json::getString(params, "validatedModel");
+        if (!programLib_.promote(id, model)) {
+            return json::error("NOT_FOUND or illegal transition: " + id);
+        }
+        auto m = programLib_.get(id);
+        return json::ok(m ? m->toJson() : "{}");
+    }
+
+    std::string handleRecordProgramValidation(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        std::string id = json::getString(params, "programId");
+        std::string model = json::getString(params, "model");
+        if (!programLib_.recordValidation(id, model)) {
+            return json::error("NOT_FOUND: " + id);
+        }
+        auto m = programLib_.get(id);
+        return json::ok(m ? m->toJson() : "{}");
+    }
+
+    std::string handleAppendProgramLineage(const std::string& raw) {
+        std::string params = json::getRawValue(raw, "params");
+        std::string id = json::getString(params, "programId");
+        std::string event = json::getRawValue(params, "event");
+        if (id.empty() || event.empty()) {
+            return json::error("programId and event required");
+        }
+        if (!programLib_.appendLineage(id, event)) {
+            return json::error("NOT_FOUND: " + id);
+        }
+        return json::ok("{\"appended\":true}");
     }
 
     UnixSocketServer server_;
